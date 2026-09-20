@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kios Pak Wan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<!-- Firebase (gratis) untuk menyimpan data barang & QRIS supaya semua pengunjung otomatis lihat versi terbaru -->
+<script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore-compat.js"></script>
+
+<style>
+  :root{
+    --ink:#241A12;
+    --paper:#FAF5E7;
+    --card:#FFFFFF;
+    --green:#134B3A;
+    --green-deep:#0B2F24;
+    --gold:#C69A3E;
+    --gold-soft:#E4C077;
+    --red:#7C2233;
+    --red-deep:#551824;
+    --line: rgba(36,26,18,0.13);
+    box-sizing:border-box;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --paper:#17130E; --card:#221B14; --ink:#F2E8D6;
+      --green:#1D6650; --gold:#D8B15C; --red:#9C3A46;
+      --line: rgba(242,232,214,0.16);
+    }
+  }
+  *{box-sizing:inherit;}
+  html,body{height:100%;}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:'Public Sans',system-ui,sans-serif; -webkit-font-smoothing:antialiased;
+  }
+  img{max-width:100%; display:block;}
+  button{font-family:inherit;}
+  :focus-visible{outline:2px solid var(--gold); outline-offset:2px;}
+  @media (prefers-reduced-motion:reduce){ *{transition:none !important; animation:none !important;} }
+
+  .hero{
+    background:linear-gradient(160deg, var(--red) 0%, var(--red-deep) 100%);
+    color:#F7ECD8; padding:34px 20px 32px;
+  }
+  .hero-inner{max-width:640px; margin:0 auto;}
+  .hero .tagline{margin:0 0 8px; font-size:0.95rem; font-style:italic; color:var(--gold-soft);}
+  .hero h1{
+    font-family:'Fraunces',serif; font-weight:600; font-size:clamp(2.1rem,7vw,2.9rem);
+    margin:0; letter-spacing:-0.01em; color:#FBF3E2;
+  }
+  .ribbon{height:9px; display:flex;}
+  .ribbon span{flex:1;}
+  .ribbon .r{background:var(--red);}
+  .ribbon .g{background:var(--gold);}
+  .ribbon .e{background:var(--green);}
+
+  .admin-banner{
+    max-width:640px; margin:0 auto; padding:10px 20px; font-size:0.78rem;
+    color:var(--ink); opacity:0.8; text-align:center;
+  }
+  .admin-banner button{
+    background:none; border:1px solid var(--line); border-radius:8px;
+    padding:3px 8px; margin-left:6px; cursor:pointer; font-size:0.75rem;
+  }
+
+  .chips{display:flex; gap:8px; padding:16px 20px; overflow-x:auto; max-width:640px; margin:0 auto; scrollbar-width:none;}
+  .chips::-webkit-scrollbar{display:none;}
+  .chip{flex:none; padding:8px 14px; border-radius:999px; border:1px solid var(--line); background:var(--card); color:var(--ink); font:500 0.88rem 'Public Sans',sans-serif; cursor:pointer;}
+  .chip.active{background:var(--green); color:var(--gold-soft); border-color:var(--green);}
+
+  .grid{display:grid; grid-template-columns:repeat(2,1fr); gap:16px; padding:4px 20px 60px; max-width:640px; margin:0 auto;}
+  @media(min-width:560px){ .grid{grid-template-columns:repeat(3,1fr);} }
+  @media(min-width:860px){ .grid{grid-template-columns:repeat(4,1fr); max-width:960px;} }
+
+  .card{background:var(--card); border:1px solid var(--line); border-radius:14px; overflow:hidden; display:flex; flex-direction:column;}
+  .thumb{position:relative; aspect-ratio:1/1; background:#EFE7D6; display:flex; align-items:center; justify-content:center; overflow:hidden;}
+  .thumb img{width:100%; height:100%; object-fit:cover;}
+  .thumb svg{width:38%; height:38%; opacity:0.35;}
+  .price-tag{
+    position:absolute; top:9px; left:-6px; background:var(--gold); color:#2A1B08;
+    font:700 0.76rem 'Public Sans',sans-serif; padding:4px 10px 4px 14px; border-radius:0 6px 6px 0;
+    transform:rotate(-4deg); box-shadow:1px 2px 0 rgba(0,0,0,0.12);
+  }
+  .info{padding:10px 12px 12px; flex:1; display:flex; flex-direction:column; gap:4px;}
+  .info h3{margin:0; font:600 1rem 'Fraunces',serif; line-height:1.25;}
+  .info p{margin:0; font-size:0.8rem; opacity:0.75; line-height:1.35;}
+  .cat{font-size:0.7rem; opacity:0.55; margin-top:auto; padding-top:4px;}
+  .admin-row{display:flex; border-top:1px solid var(--line);}
+  .admin-row button{flex:1; border:0; background:none; padding:9px; font:500 0.78rem 'Public Sans',sans-serif; cursor:pointer;}
+  .admin-row .edit{color:var(--green); border-right:1px solid var(--line);}
+  .admin-row .del{color:var(--red);}
+
+  .empty{grid-column:1/-1; text-align:center; padding:48px 20px; opacity:0.7; font-size:0.95rem;}
+
+  .fabs{position:fixed; right:16px; bottom:16px; display:flex; flex-direction:column; gap:10px; z-index:5;}
+  .fab{border:0; border-radius:999px; padding:12px 18px; font:600 0.88rem 'Public Sans',sans-serif; box-shadow:0 4px 14px rgba(0,0,0,0.2); cursor:pointer;}
+  .fab-qris{background:var(--green); color:var(--gold-soft);}
+  .fab-add{background:var(--red); color:#FBF3E2;}
+
+  .foot{max-width:640px; margin:0 auto; padding:10px 20px 30px; font-size:0.76rem; opacity:0.55; text-align:center;}
+
+  .overlay{position:fixed; inset:0; background:rgba(18,14,9,0.52); display:flex; align-items:flex-end; justify-content:center; z-index:20;}
+  @media(min-width:560px){ .overlay{align-items:center;} }
+  .sheet{background:var(--card); color:var(--ink); width:100%; max-width:480px; border-radius:18px 18px 0 0; padding:22px 20px; max-height:88vh; overflow-y:auto;}
+  @media(min-width:560px){ .sheet{border-radius:18px;} }
+  .sheet h2{font:600 1.3rem 'Fraunces',serif; margin:0 0 14px;}
+  .sheet label{display:block; font-size:0.82rem; margin-bottom:13px;}
+  .sheet input, .sheet select, .sheet textarea{display:block; width:100%; margin-top:5px; padding:9px 10px; border:1px solid var(--line); border-radius:8px; background:var(--paper); color:var(--ink); font:400 0.95rem 'Public Sans',sans-serif;}
+  .sheet textarea{min-height:60px; resize:vertical;}
+  .sheet .hint{font-size:0.85rem; opacity:0.75; text-align:center; margin:0 0 4px;}
+  .preview{margin:6px 0 14px; text-align:center;}
+  .preview img{max-width:100%; max-height:220px; border-radius:10px; margin:0 auto;}
+  .preview span{font-size:0.82rem; opacity:0.55;}
+  .sheet-actions{display:flex; gap:10px; margin-top:8px;}
+  .sheet-actions button{flex:1; padding:11px; border-radius:10px; border:0; font:600 0.88rem 'Public Sans',sans-serif; cursor:pointer;}
+  .sheet-actions .ghost{background:transparent; border:1px solid var(--line); color:var(--ink);}
+  .sheet-actions .primary{background:var(--green); color:var(--gold-soft);}
+  .sheet-actions .primary:disabled{opacity:0.5;}
+  .sheet-actions .danger{background:transparent; border:1px solid var(--red); color:var(--red);}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+/* ======================================================================
+   1) GANTI BAGIAN INI dengan Firebase config project kamu sendiri.
+      Lihat langkah-langkah setup yang saya jelaskan di chat.
+   ====================================================================== */
+const firebaseConfig = {
+  apiKey: "AIzaSyD74amezMR_Q50AlH_jG7DO9RRzABttYQU",
+  authDomain: "kios-pak-wan.firebaseapp.com",
+  projectId: "kios-pak-wan",
+  storageBucket: "kios-pak-wan.firebasestorage.app",
+  messagingSenderId: "306089678006",
+  appId: "1:306089678006:web:821ee3d3c7d5015cb38217"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const auth = firebase.auth();
+
+/* ====================================================================== */
+
+const SHOP = {
+  name: 'Kios Pak Wan',
+  tagline: 'Cek dulu ada apa aja hari ini',
+  categories: ['Rokok', 'Makanan & Minuman', 'Kebutuhan Pokok', 'Lainnya']
+};
+
+let PRODUCTS = [];
+let QRIS = null;
+let activeCat = 'Semua';
+
+const params = new URLSearchParams(location.search);
+const adminMode = params.get('admin') === '1';
+let currentUid = null;
+
+function escapeHtml(s){
+  return String(s==null?'':s).replace(/[&<>"']/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+  });
+}
+function formatRupiah(n){ return 'Rp ' + Number(n||0).toLocaleString('id-ID'); }
+function placeholderIcon(){
+  return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 8h12l-1 12H7L6 8Z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg>';
+}
+
+function readAndCompress(file, opts){
+  opts = opts || {};
+  var maxDim = opts.maxDim || 700, quality = opts.quality || 0.6, mime = opts.mime || 'image/jpeg';
+  return new Promise(function(resolve, reject){
+    var reader = new FileReader();
+    reader.onload = function(){
+      var img = new Image();
+      img.onload = function(){
+        var w = img.width, h = img.height;
+        if(w > h && w > maxDim){ h = Math.round(h * maxDim / w); w = maxDim; }
+        else if(h >= w && h > maxDim){ w = Math.round(w * maxDim / h); h = maxDim; }
+        var canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        var ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#fff'; ctx.fillRect(0,0,w,h);
+        ctx.drawImage(img,0,0,w,h);
+        resolve(canvas.toDataURL(mime, quality));
+      };
+      img.onerror = reject;
+      img.src = reader.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function permissionAlert(){
+  alert('Belum bisa disimpan: UID kamu belum terdaftar sebagai admin di Firestore.\n\nLihat "UID admin" di bawah judul toko, salin, lalu tambahkan ke Firestore (config/admin > adminUids), kemudian coba lagi.');
+}
+
+function productCard(p, owner){
+  return '<article class="card">' +
+    '<div class="thumb">' +
+      (p.photo ? '<img src="'+p.photo+'" alt="'+escapeHtml(p.name)+'">' : placeholderIcon()) +
+      '<span class="price-tag">'+formatRupiah(p.price)+'</span>' +
+    '</div>' +
+    '<div class="info">' +
+      '<h3>'+escapeHtml(p.name)+'</h3>' +
+      (p.description ? '<p>'+escapeHtml(p.description)+'</p>' : '') +
+      '<span class="cat">'+escapeHtml(p.category||'Lainnya')+'</span>' +
+    '</div>' +
+    (owner ? '<div class="admin-row">' +
+      '<button data-action="edit" data-id="'+p.id+'">Ubah</button>' +
+      '<button class="del" data-action="delete" data-id="'+p.id+'">Hapus</button>' +
+    '</div>' : '') +
+  '</article>';
+}
+
+function render(){
+  var app = document.getElementById('app');
+  var owner = adminMode;
+  var cats = ['Semua'].concat(SHOP.categories);
+  var filtered = activeCat === 'Semua' ? PRODUCTS : PRODUCTS.filter(function(p){ return p.category === activeCat; });
+
+  var html = '';
+  html += '<header class="hero"><div class="hero-inner">' +
+    '<p class="tagline">'+escapeHtml(SHOP.tagline)+'</p>' +
+    '<h1>'+escapeHtml(SHOP.name)+'</h1>' +
+  '</div></header>';
+  html += '<div class="ribbon" aria-hidden="true"><span class="r"></span><span class="g"></span><span class="e"></span></div>';
+
+  if(owner){
+    html += '<div class="admin-banner">Mode admin aktif.' +
+      (currentUid ? ' UID admin kamu: <code>'+currentUid+'</code><button id="btn-copy-uid">Salin</button>' : ' Menyambungkan…') +
+    '</div>';
+  }
+
+  html += '<nav class="chips" aria-label="Kategori barang">';
+  cats.forEach(function(c){
+    html += '<button class="chip'+(c===activeCat?' active':'')+'" data-cat="'+escapeHtml(c)+'">'+escapeHtml(c)+'</button>';
+  });
+  html += '</nav>';
+
+  html += '<main class="grid">';
+  if(filtered.length){
+    filtered.forEach(function(p){ html += productCard(p, owner); });
+  } else {
+    html += '<div class="empty">' + (owner ?
+      'Belum ada barang di kategori ini. Tambahkan lewat tombol "+ Barang" di kanan bawah.' :
+      'Barang di kategori ini belum ditambahkan oleh pemilik toko.') + '</div>';
+  }
+  html += '</main>';
+
+  html += '<div class="fabs">';
+  if(QRIS){
+    html += '<button class="fab fab-qris" id="btn-qris">Lihat QRIS</button>';
+  } else if(owner){
+    html += '<button class="fab fab-qris" id="btn-qris">+ QRIS</button>';
+  }
+  if(owner){
+    html += '<button class="fab fab-add" id="btn-add">+ Barang</button>';
+  }
+  html += '</div>';
+
+  html += '<footer class="foot"><p>Halaman info barang '+escapeHtml(SHOP.name)+' — bukan toko belanja online. Datang atau hubungi langsung untuk membeli.</p></footer>';
+
+  app.innerHTML = html;
+  attachHandlers(owner);
+}
+
+function attachHandlers(owner){
+  document.querySelectorAll('.chip').forEach(function(btn){
+    btn.onclick = function(){ activeCat = btn.dataset.cat; render(); };
+  });
+  var copyBtn = document.getElementById('btn-copy-uid');
+  if(copyBtn) copyBtn.onclick = function(){ navigator.clipboard.writeText(currentUid); };
+  var addBtn = document.getElementById('btn-add');
+  if(addBtn) addBtn.onclick = function(){ openProductModal(null); };
+  var qrisBtn = document.getElementById('btn-qris');
+  if(qrisBtn) qrisBtn.onclick = function(){ openQrisModal(owner); };
+  document.querySelectorAll('[data-action="edit"]').forEach(function(b){
+    b.onclick = function(){
+      var prod = PRODUCTS.find(function(x){ return x.id === b.dataset.id; });
+      openProductModal(prod);
+    };
+  });
+  document.querySelectorAll('[data-action="delete"]').forEach(function(b){
+    b.onclick = async function(){
+      if(!confirm('Hapus barang ini?')) return;
+      try{
+        await db.collection('products').doc(b.dataset.id).delete();
+      }catch(e){ console.error(e); permissionAlert(); }
+    };
+  });
+}
+
+function openProductModal(existing){
+  var isEdit = !!existing;
+  var p = existing || {id:null, name:'', price:'', description:'', category:SHOP.categories[0], photo:null};
+  var pendingPhoto = p.photo;
+  var overlay = document.createElement('div');
+  overlay.className = 'overlay';
+  overlay.innerHTML =
+    '<div class="sheet">' +
+      '<h2>'+(isEdit?'Ubah barang':'Tambah barang')+'</h2>' +
+      '<label>Nama barang<input id="f-name" value="'+escapeHtml(p.name)+'" placeholder="Contoh: Indomie Goreng"></label>' +
+      '<label>Harga (Rp)<input id="f-price" type="number" inputmode="numeric" value="'+(p.price||'')+'" placeholder="3500"></label>' +
+      '<label>Kategori<select id="f-cat">'+SHOP.categories.map(function(c){ return '<option'+(c===p.category?' selected':'')+'>'+escapeHtml(c)+'</option>'; }).join('')+'</select></label>' +
+      '<label>Keterangan (opsional)<textarea id="f-desc" placeholder="Ukuran, varian, dll">'+escapeHtml(p.description||'')+'</textarea></label>' +
+      '<label>Foto barang<input id="f-photo" type="file" accept="image/*"></label>' +
+      '<div class="preview" id="f-preview">'+(pendingPhoto ? '<img src="'+pendingPhoto+'">' : '<span>Belum ada foto</span>')+'</div>' +
+      '<div class="sheet-actions">' +
+        '<button class="ghost" id="f-cancel">Batal</button>' +
+        '<button class="primary" id="f-save">Simpan</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+
+  overlay.querySelector('#f-photo').addEventListener('change', async function(e){
+    var file = e.target.files[0];
+    if(!file) return;
+    pendingPhoto = await readAndCompress(file, {maxDim:700, quality:0.6, mime:'image/jpeg'});
+    overlay.querySelector('#f-preview').innerHTML = '<img src="'+pendingPhoto+'">';
+  });
+  overlay.querySelector('#f-cancel').onclick = function(){ overlay.remove(); };
+  overlay.querySelector('#f-save').onclick = async function(){
+    var name = overlay.querySelector('#f-name').value.trim();
+    if(!name){ alert('Nama barang wajib diisi.'); return; }
+    var price = parseInt(overlay.querySelector('#f-price').value || '0', 10);
+    var cat = overlay.querySelector('#f-cat').value;
+    var desc = overlay.querySelector('#f-desc').value.trim();
+    var data = {name:name, price:price, category:cat, description:desc, photo:pendingPhoto};
+    try{
+      if(isEdit){
+        await db.collection('products').doc(p.id).update(data);
+      } else {
+        data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+        await db.collection('products').add(data);
+      }
+      overlay.remove();
+    }catch(e){ console.error(e); permissionAlert(); }
+  };
+}
+
+function openQrisModal(owner){
+  var overlay = document.createElement('div');
+  overlay.className = 'overlay';
+  if(owner){
+    overlay.innerHTML =
+      '<div class="sheet">' +
+        '<h2>QRIS pembayaran</h2>' +
+        (QRIS ? '<div class="preview" id="qris-preview"><img src="'+QRIS+'"></div>' : '<div class="preview" id="qris-preview"><span>Belum ada gambar QRIS</span></div>') +
+        '<label>'+(QRIS?'Ganti gambar QRIS':'Unggah gambar QRIS')+'<input id="f-qris" type="file" accept="image/*"></label>' +
+        '<div class="sheet-actions">' +
+          (QRIS ? '<button class="danger" id="f-remove">Hapus</button>' : '') +
+          '<button class="ghost" id="f-cancel">Tutup</button>' +
+          '<button class="primary" id="f-save" disabled>Simpan</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(overlay);
+    var pending = null;
+    overlay.querySelector('#f-qris').addEventListener('change', async function(e){
+      var file = e.target.files[0];
+      if(!file) return;
+      pending = await readAndCompress(file, {maxDim:500, quality:0.9, mime:'image/png'});
+      overlay.querySelector('#qris-preview').innerHTML = '<img src="'+pending+'">';
+      overlay.querySelector('#f-save').disabled = false;
+    });
+    overlay.querySelector('#f-cancel').onclick = function(){ overlay.remove(); };
+    var removeBtn = overlay.querySelector('#f-remove');
+    if(removeBtn) removeBtn.onclick = async function(){
+      if(!confirm('Hapus gambar QRIS?')) return;
+      try{ await db.collection('settings').doc('qris').delete(); overlay.remove(); }
+      catch(e){ console.error(e); permissionAlert(); }
+    };
+    overlay.querySelector('#f-save').onclick = async function(){
+      if(!pending) return;
+      try{ await db.collection('settings').doc('qris').set({image:pending}); overlay.remove(); }
+      catch(e){ console.error(e); permissionAlert(); }
+    };
+  } else {
+    overlay.innerHTML =
+      '<div class="sheet">' +
+        '<h2>Bayar via QRIS</h2>' +
+        '<div class="preview"><img src="'+QRIS+'"></div>' +
+        '<p class="hint">Pindai kode ini untuk membayar ke '+escapeHtml(SHOP.name)+'.</p>' +
+        '<div class="sheet-actions"><button class="primary" id="f-close">Tutup</button></div>' +
+      '</div>';
+    document.body.appendChild(overlay);
+    overlay.querySelector('#f-close').onclick = function(){ overlay.remove(); };
+  }
+}
+
+function subscribe(){
+  db.collection('products').orderBy('createdAt','asc').onSnapshot(function(snap){
+    PRODUCTS = snap.docs.map(function(d){ return Object.assign({id:d.id}, d.data()); });
+    render();
+  }, function(err){ console.error('products:', err); render(); });
+
+  db.collection('settings').doc('qris').onSnapshot(function(doc){
+    QRIS = doc.exists ? doc.data().image : null;
+    render();
+  }, function(err){ console.error('qris:', err); });
+}
+
+async function init(){
+  if(adminMode){
+    try{
+      var cred = await auth.signInAnonymously();
+      currentUid = cred.user.uid;
+    }catch(e){ console.error(e); }
+  }
+  subscribe();
+  render();
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
